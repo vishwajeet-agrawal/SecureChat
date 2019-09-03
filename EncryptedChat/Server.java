@@ -6,15 +6,18 @@ public class Server{
 	private String ip_address = 'localhost';
 	// private ConcurrentHashMap<String,User> speaking_users = HashMap();
 	private ConcurrentHashMap<String,User> Allusers = ConcurrentHashMap();
-	// private ConcurrentHashMap<InetAddress,User> AllUsers = HashMap();
+	private HashSet<String> users;
+	// private ConcurrentHashMap<InetAddress,String> IpToUser = HashMap();
 	private ServerSocket speaking_socket = null;
 	private ServerSocket listening_socket = null;
 	private int port_send;
 	private int port_receive;
 	private Thread send_thread;
 	private Thread receive_thread;
-	private ConcurrentHashMap<InetAddress,Thread> receive_sockets = new ConcurrentHashMap<>();
-	private ConcurrentHashMap<InetAddress,Thread> send_sockets = new ConcurrentHashMap<>();
+	private ConcurrentHashMap<String,ClientHandlerForReceive> receive_users = new ConcurrentHashMap<>();
+	private ConcurrentHashMap<String,ClientHandlerForSend> send_users = new ConcurrentHashMap<>();
+	private HashSet<ClientHandlerForReceive> receive_handlers = new HashSet<>();
+	private HashSet<ClientHandlerForSend> send_handlers = new HashSet<>();
 
 	class ReceiveSocket implements Runnable{
 		void run(){
@@ -22,8 +25,8 @@ public class Server{
 				Socket s = Server.this.listening_socket.accept();
 				BufferedReader ack_stream = new BufferedReader(new InputStreamReader(s.getInputStream()));
 				BufferedWriter message_stream = new BufferedWriter(new OutputStreamWriter(s.getOutputStream()));
-				Thread t = new Thread(new ClientHandlerForReceive(s,ack_stream,message_stream));
-				Server.this.receive_sockets.put(s.getInetAddress(),t);
+				ClientHandlerForReceive t = new ClientHandlerForReceive(s,ack_stream,message_stream);
+				Server.this.receive_sockets.add(t);
 				t.start();
 			}
 		}
@@ -34,8 +37,8 @@ public class Server{
 				Socket s = Server.this.speaking_socket.accept();
 				BufferedReader message_stream = new BufferedReader(new InputStreamReader(s_send.getInputStream()));
 				BufferedWriter ack_stream = new BufferedWriter(new OutputStreamWriter(s_send.getOutputStream()));
-				Thread t = new Thread(new ClientHandlerForSend(s,message_stream,ack_stream));
-				Server.this.send_sockets.put(s.getInetAddress(),t);
+				ClientHandlerForSend t = new ClientHandlerForSend(s,message_stream,ack_stream);
+				Server.this.send_sockets.add(t);
 				t.start();
 			}		
 		}
@@ -57,65 +60,253 @@ public class Server{
 		this = Server(5001,5002);
 	}	
 	
-	class ClientHandlerForSend implements Runnable{
+	class ClientHandlerForSend extends Thread{
 		Socket s;
 		BufferedReader messg;
 		BufferedWriter ack;
+		String username = new String();
+		// PipedInputStream pis; // receiving acknowledges of sending messages to other from other users reading end
+		// PipedOutputStream pos;	// writing end
 		ClientHandlerForSend(Socket s, BufferedReader br, BufferedWriter bw){
 			this.s = s;
 			this.mesg = br;
 			this.ack = bw;
+			// pis = new PipedInputStream();
+			// pos = new PipedOutputStream();
+			// pis.connect(pos);
+			// pos.connect(pis);
+
 		}
+
 		void run(){
-			String s1 = messg.readLine();
-			if (messg.read()=='\n'){
-				if (s1.substring(0,16) == "REGISTER TOSEND "){
-					String usr = s1.substring(16);
+			// loop for registering the user to send
+			while(true){
+				String s1 = messg.readLine();
+				int error=0;
+				if (messg.read()=='\n'){
+					if (s1.substring(0,16) == "REGISTER TOSEND "){
+						String usr = s1.substring(16);
+						if (Server.this.send_users.containsKey(usr)){
+							//error user already present
+						}
+						else if (Server.this.checkUsernameWellFormed(usr)){
+							Server.this.send_users.put(usr,this);
+							if (Server.this.receive_users.containsKey(usr)){
+								Server.this.users.put(usr);
+							}
+							username = usr;
+							//success 
+							break;
+						}
+						else{
+							error = 100; //user malformed
+						}
+
+					}
+					else{
+						error = 101;
+					}
+				}
+				else{
+					error = 101;
+				}
+				switch(error){
+					case 101:
+						ack.write("ERROR 101 No user registered");
+						ack.newLine();
+						ack.newLine();
+						ack.flush();
+						break;
+					case 100:
+						ack.write("ERROR 100 Malformed username");
+						ack.newLine();
+						ack.newLine();
+						ack.flush();
+						break;
+					case 102:
+
+					default:
 
 				}
-				
 			}
+
+			// loop for actual communication
+			while(true){
+				String s1 = messg.readLine();
+				int error=0;
+				if (messg.read()=='\n'){
+					if (s1.substring(0,5)=="SEND "){
+						String usr_to_receive = s1.substring(5);
+						if (Server.this.users.contains(usr_to_receive)){
+							s1 = messg.readLine();
+							if (s1.substring(0,16)=="Content-Length: "){
+								if (messg.read()=='\n'){
+									int number_chars = Integer.parseInt(s1.substring(17));
+									char[] msg_to_send = new char[number_chars];
+									messg.read(msg_to_send,0,number_chars);
+									// now find the user to send the message to and send him the message
+									ClientHandlerForReceive receive_end = receive_users.get(usr_to_receive);
+									//acquire its lock
+									receive_end.lock_stream.lock();
+									receive_end.mesg.write("FORWARD ");
+									receive_end.mesg.write(username);
+									receive_end.mesg.newLine();
+									receive_end.mesg.write("Content-Length: ");
+									receive_end.mesg.write(Integer.toString(number_chars));
+									receive_end.mesg.newLine();
+									receive_end.mesg.newLine();
+									receive_end.mesg.write(msg_to_send,0,number_chars);
+									receive_end.mesg.flush();
+									//then reveive ack
+									String ack_m = receive_end.ack.readLine();
+									if (receive_end.ack.read()=='\n'){
+										if (ack_m.substring(0,9)=="RECEIVED "){
+											if (ack_m.substring(9)==username){
+												ack.write("SENT ");
+												ack.write(usr_to_receive);
+												ack.newLine();
+												ack.newLine();
+												ack.flush();
+											}
+											else{
+												error = 102;
+											}
+										}
+										else{
+											error = 102;
+										}
+									}
+									else{
+										//error bad ack
+										error = 102;
+									}
+									//release the lock
+									receive_end.lock_stream.unlock();
+								}
+								else{
+									error = 103;
+								}
+							}
+							else{
+								error = 103;
+							}
+						}
+						else{
+							//error user to send message not found
+							error = 101;
+						}
+					}
+					else{
+						error = 103;
+					}
+				}
+				else{
+					error = 103;
+				}
+				switch(error){
+					case 101:
+						ack.write("ERROR 101 No user registered");
+						ack.newLine();
+						ack.newLine();
+						ack.flush();
+						break;
+					case 102:
+						ack.write("ERROR 102 Unable to send");
+						ack.newLine();
+						ack.newLine();
+						ack.flush();
+						break;
+					case 103:
+						ack.write("Error 103 Header incomplete");
+						ack.newLine();
+						ack.newLine();
+						ack.flush();
+						break;
+					default:
+
+				}
+			}			
 		}
 	}
 
 	
-	class ClientHandlerForReceive implements Runnable{
+	class ClientHandlerForReceive extends Thread{
 		Socket s;
-		BufferedReader ack;
-		BufferedWriter mesg;
+		Lock lock_stream;
+		BufferedReader ack; //coming from client
+		BufferedWriter mesg; //writing to client
+		String username = new String();
+		// PipedInputStream pis;	// messages coming from other users to be read from here.
+		// PipedOutputStream pos; 	// message coming from other users to be written to this stream.
 		ClientHandlerForReceive(s,br,bw){
 			this.s = s;
 			this.ack = br;
 			this.mesg = bw;
+			lock = new Lock();
+			lock_stream.lock();
+			// pis = new PipedInputStream();
+			// pos = new PipedOutputStream(pis);
+			// pis.connect(pos);
 		}
 		void run(){
-			String s1 = ack.readLine();
-			if (mesg.read()=='\n'){
-				if (s1.substring(0,16) == "REGISTER TORECV"){
-					String usr = s1.substring(16);
+			while(true){
+				String s1 = ack.readLine();
+				if (mesg.read()=='\n'){
+					if (s1.substring(0,16) == "REGISTER TORECV "){
+						String usr = s1.substring(16);
+						if (Server.this.receive_users.containsKey(usr)){
+							//error user already registered
+						}
+						else if (Server.this.checkUsernameWellFormed(usr)){
+							Server.this.receive_users.put(usr,this);
+							if (Server.this.send_users.containsKey(usr)){
+								Server.this.users.add(usr);
+							}
+							username = usr;
+							//success 
+							break;
+						}
+						else{
+							error = 100; //user malformed
+						}
+					}
+					else{
+						error = 101;
+					}
+				}
+				else{
+					error = 101; //no user registered
+				}
+				switch(error){
+					case 101:
+						ack.write("ERROR 101 No user registered");
+						ack.newLine();
+						ack.newLine();
+						ack.flush();
+						break;
+					case 100:
+						ack.write("ERROR 100 Malformed username");
+						ack.newLine();
+						ack.newLine();
+						ack.flush();
+						break;
 				}
 			}
-		}	
+
 
 	}
 	public static void main(String[] args){
 		new Server();
 	}
-
-}
-
-
-
-class User extends Thread{
-	private String username;
-	private Socket socket;
-	private BufferedWriter bw;
-	private BufferedReader br;
-	User(){
-
-	}
-	void run(){
-
-	}
+	Boolean checkUsernameWellFormed(String usr){
+		Boolean check = true;
+		for(int i=0;i<usr.length();i++){
+			char x = usr.charAt(i);
+			if ((x >= 48 && x<=57) || (x>=65 && x<=90) || (x>=97 && x<=122)){
+				check = check && true;
+			}
+		}
+		return check;
+	}	
 
 }
