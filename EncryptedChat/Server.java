@@ -3,7 +3,10 @@ import java.io.*;
 import java.util.*;
 
 public class Server{
-	private String ip_address = 'localhost';
+	public static void main(String[] args){
+		new Server();
+	}
+	private String ip_address = "localhost";
 	// private ConcurrentHashMap<String,User> speaking_users = HashMap();
 	private ConcurrentHashMap<String,User> Allusers = ConcurrentHashMap();
 	private HashSet<String> users;
@@ -20,7 +23,7 @@ public class Server{
 	private HashSet<ClientHandlerForSend> send_handlers = new HashSet<>();
 
 	class ReceiveSocket implements Runnable{
-		void run(){
+		public void run(){
 			while(true){
 				Socket s = Server.this.listening_socket.accept();
 				BufferedReader ack_stream = new BufferedReader(new InputStreamReader(s.getInputStream()));
@@ -32,7 +35,7 @@ public class Server{
 		}
 	}
 	class SendSocket implements Runnable{	
-		void run(){
+		public void run(){
 			while(true){
 				Socket s = Server.this.speaking_socket.accept();
 				BufferedReader message_stream = new BufferedReader(new InputStreamReader(s_send.getInputStream()));
@@ -57,7 +60,7 @@ public class Server{
 	}
 	Server(){
 		// 5001 for send and 5002 for receive
-		this = Server(5001,5002);
+		Server(5001,5002);
 	}	
 	
 	class ClientHandlerForSend extends Thread{
@@ -78,7 +81,7 @@ public class Server{
 
 		}
 
-		void run(){
+		public void run(){
 			// loop for registering the user to send
 			while(true){
 				String s1 = messg.readLine();
@@ -238,7 +241,7 @@ public class Server{
 		String username = new String();
 		// PipedInputStream pis;	// messages coming from other users to be read from here.
 		// PipedOutputStream pos; 	// message coming from other users to be written to this stream.
-		ClientHandlerForReceive(s,br,bw){
+		ClientHandlerForReceive(Socket s,BufferedReader br,BufferedWriter bw){
 			this.s = s;
 			this.ack = br;
 			this.mesg = bw;
@@ -248,7 +251,7 @@ public class Server{
 			// pos = new PipedOutputStream(pis);
 			// pis.connect(pos);
 		}
-		void run(){
+		public void run(){
 			while(true){
 				String s1 = ack.readLine();
 				if (mesg.read()=='\n'){
@@ -295,9 +298,7 @@ public class Server{
 
 
 	}
-	public static void main(String[] args){
-		new Server();
-	}
+}
 	Boolean checkUsernameWellFormed(String usr){
 		Boolean check = true;
 		for(int i=0;i<usr.length();i++){
