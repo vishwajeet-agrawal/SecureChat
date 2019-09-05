@@ -3,20 +3,25 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.Collections;
 
 public class Server{
+	public void print(String s){
+		System.out.print(s);
+	}
 	public static void main(String[] args){
 		try{
 			new Server();
 		}
 		catch(Exception e){
 			System.out.println("Uncaught exception");
+			e.printStackTrace();
 		}
 	}
 	private String ip_address = "localhost";
 	// private ConcurrentHashMap<String,User> speaking_users = HashMap();
 	//private ConcurrentHashMap<String,User> Allusers = ConcurrentHashMap<>();
-	private HashSet<String> users = new HashSet<>();
+	private Set<String> users = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());;
 	// private ConcurrentHashMap<InetAddress,String> IpToUser = HashMap();
 	private ServerSocket speaking_socket = null;
 	private ServerSocket listening_socket = null;
@@ -43,6 +48,7 @@ public class Server{
 		}
 		catch(Exception e){
 			System.out.println("UC receive_socket");
+			e.printStackTrace();
 		}
 		}
 	}
@@ -60,6 +66,7 @@ public class Server{
 		}
 		catch(Exception e){
 			System.out.println("UC send_socket");
+			e.printStackTrace();
 		}		
 		}
 	}
@@ -79,6 +86,7 @@ public class Server{
 		}
 		catch(Exception e){
 			System.out.println("UCE 1");
+			e.printStackTrace();
 		}
 	}
 	
@@ -100,11 +108,6 @@ public class Server{
 			this.s = s;
 			this.messg = br;
 			this.ack = bw;
-			// pis = new PipedInputStream();
-			// pos = new PipedOutputStream();
-			// pis.connect(pos);
-			// pos.connect(pis);
-
 		}
 
 		public void run(){
@@ -112,9 +115,15 @@ public class Server{
 			// loop for registering the user to send
 			while(true){
 				String s1 = messg.readLine();
+				// print(s1);//
 				int error=0;
 				if (messg.read()=='\n'){
-					if (s1.substring(0,16) == "REGISTER TOSEND "){
+					if (s1.length()<=16){
+						error = 101;
+					}
+					else if (s1.substring(0,16).equals("REGISTER TOSEND ")){
+						// System.out.println("REgistered to send ");
+
 						String usr = s1.substring(16);
 						if (send_users.containsKey(usr)){
 							//error user already present
@@ -129,6 +138,7 @@ public class Server{
 							ack.newLine();
 							ack.newLine();
 							ack.flush();
+							// System.out.println("REgistered to send ");
 							//success 
 							break;
 						}
@@ -167,35 +177,52 @@ public class Server{
 			// loop for actual communication
 			while(true){
 				String s1 = messg.readLine();
+				// print(s1);
+				// System.out.println(s1.length());
 				int error=0;
-				if (messg.read()=='\n'){
-					if (s1.substring(0,5)=="SEND "){
-						String usr_to_receive = s1.substring(5);
-						if (users.contains(usr_to_receive)){
-							s1 = messg.readLine();
-							if (s1.substring(0,16)=="Content-Length: "){
-								if (messg.read()=='\n'){
-									int number_chars = Integer.parseInt(s1.substring(17));
-									char[] msg_to_send = new char[number_chars];
-									messg.read(msg_to_send,0,number_chars);
-									// now find the user to send the message to and send him the message
+				if (s1.length()<=5){
+					error = 105;
+				}
+				else if (s1.substring(0,5).equals("SEND ")){
+					// print(s1);
+					String usr_to_receive = s1.substring(5);
+					if (users.contains(usr_to_receive)){
+						s1 = messg.readLine();
+						if (s1.substring(0,16).equals("Content-length: ")){
+							if (messg.read()=='\n'){
+								int number_chars = Integer.parseInt(s1.substring(16));
+								char[] msg_to_send = new char[number_chars+2];
+								messg.read(msg_to_send,0,number_chars+2);
+								if (!(msg_to_send[number_chars+1]=='\n' && msg_to_send[number_chars]=='\n')){
+									error = 102;
+								}
+								else{
+								// now find the user to send the message to and send him the message
 									ClientHandlerForReceive receive_end = receive_users.get(usr_to_receive);
+									
 									//acquire its lock
 									receive_end.lock_stream.lock();
+
+									//forward the message
 									receive_end.mesg.write("FORWARD ");
 									receive_end.mesg.write(username);
 									receive_end.mesg.newLine();
-									receive_end.mesg.write("Content-Length: ");
+									receive_end.mesg.write("Content-length: ");
 									receive_end.mesg.write(Integer.toString(number_chars));
 									receive_end.mesg.newLine();
 									receive_end.mesg.newLine();
 									receive_end.mesg.write(msg_to_send,0,number_chars);
+									receive_end.mesg.newLine();
+									receive_end.mesg.newLine();
 									receive_end.mesg.flush();
+
 									//then reveive ack
 									String ack_m = receive_end.ack.readLine();
 									if (receive_end.ack.read()=='\n'){
-										if (ack_m.substring(0,9)=="RECEIVED "){
-											if (ack_m.substring(9)==username){
+										if (ack_m.substring(0,9).equals("RECEIVED ")){
+											if (ack_m.substring(9).equals(username)){
+												
+									
 												ack.write("SENT ");
 												ack.write(usr_to_receive);
 												ack.newLine();
@@ -211,14 +238,12 @@ public class Server{
 										}
 									}
 									else{
-										//error bad ack
+									//error bad ack
 										error = 102;
 									}
+									
 									//release the lock
 									receive_end.lock_stream.unlock();
-								}
-								else{
-									error = 103;
 								}
 							}
 							else{
@@ -226,45 +251,83 @@ public class Server{
 							}
 						}
 						else{
-							//error user to send message not found
-							error = 101;
+							error = 103;
 						}
 					}
 					else{
-						error = 103;
+						//error user to send message not found
+						error = 101;
 					}
+				}
+				else if (s1.equals("UNREGISTER") && messg.read()=='\n'){
+					users.remove(username);
+					send_users.remove(username);
+					receive_users.remove(username);
+
+					ack.write("UNREGISTERED");
+					ack.newLine();
+					ack.newLine();										
+					ack.flush();
+					
+					break;
 				}
 				else{
 					error = 103;
 				}
+			
+				
 				switch(error){
 					case 101:
-						ack.write("ERROR 101 No user registered");
+						ack.write("ERROR 101 User to send message not found");
 						ack.newLine();
 						ack.newLine();
+						
 						ack.flush();
 						break;
 					case 102:
 						ack.write("ERROR 102 Unable to send");
 						ack.newLine();
 						ack.newLine();
+						
 						ack.flush();
 						break;
 					case 103:
-						ack.write("Error 103 Header incomplete");
+						ack.write("ERROR 103 Header incomplete");
+						ack.newLine();
+						ack.newLine();
+						
+						ack.flush();
+						break;
+					case 104:
+						ack.write("ERROR 104 Message Corrupted");
+						ack.newLine();
+						ack.newLine();
+						
+						ack.flush();
+						break;
+					case 105:
+						ack.write("ERROR 105 Command not found");
 						ack.newLine();
 						ack.newLine();
 						ack.flush();
 						break;
 					default:
+						ack.write("ERROR 106 Unrecognized Error");
+						ack.newLine();
+						ack.newLine();
+						ack.flush();
+						
 
 				}
 			}			
 			}
 			catch(Exception e){
-				System.out.println("UC 2");
+				e.printStackTrace();
 			}
 		}
+		// void forwardMessage(String user_to_receive, char[] msg_to_send, int number_chars){
+			
+		// }
 	}
 
 	
@@ -281,7 +344,7 @@ public class Server{
 			this.ack = br;
 			this.mesg = bw;
 			
-			lock_stream.lock();
+			//lock_stream.lock();
 			// pis = new PipedInputStream();
 			// pos = new PipedOutputStream(pis);
 			// pis.connect(pos);
@@ -290,9 +353,10 @@ public class Server{
 			try{
 			while(true){
 				int error = 0;
+				lock_stream.lock();
 				String s1 = ack.readLine();
 				if (ack.read()=='\n'){
-					if (s1.substring(0,16) == "REGISTER TORECV "){
+					if (s1.substring(0,16).equals("REGISTER TORECV ")){
 						String usr = s1.substring(16);
 						if (receive_users.containsKey(usr)){
 							//error user already registered
@@ -339,12 +403,14 @@ public class Server{
 					default:
 				}
 			}
+			lock_stream.unlock();
 		}
 		catch(Exception e){
-			System.out.println("UC 3");
+			e.printStackTrace();
 		}
 
 	}
+		
 }
 	Boolean checkUsernameWellFormed(String usr){
 		Boolean check = true;
