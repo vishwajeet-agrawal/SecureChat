@@ -22,6 +22,7 @@ public class Server{
 	// private ConcurrentHashMap<String,User> speaking_users = HashMap();
 	//private ConcurrentHashMap<String,User> Allusers = ConcurrentHashMap<>();
 	private Set<String> users = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());;
+	private ConcurrentHashMap<String,Byte[]> users_pk = new ConcurrentHashMap<>();
 	// private ConcurrentHashMap<InetAddress,String> IpToUser = HashMap();
 	private ServerSocket speaking_socket = null;
 	private ServerSocket listening_socket = null;
@@ -177,6 +178,9 @@ public class Server{
 			// loop for actual communication
 			while(true){
 				String s1 = messg.readLine();
+				// reading until 2 consecutive \n
+				// int state_ = 0 ;
+
 				// print(s1);
 				// System.out.println(s1.length());
 				int error=0;
@@ -186,7 +190,7 @@ public class Server{
 				else if (s1.substring(0,5).equals("SEND ")){
 					// print(s1);
 					String usr_to_receive = s1.substring(5);
-					if (users.contains(usr_to_receive)){
+					
 						s1 = messg.readLine();
 						if (s1.substring(0,16).equals("Content-length: ")){
 							if (messg.read()=='\n'){
@@ -198,6 +202,9 @@ public class Server{
 								}
 								else{
 								// now find the user to send the message to and send him the message
+									if (users.contains(usr_to_receive)){
+
+									
 									ClientHandlerForReceive receive_end = receive_users.get(usr_to_receive);
 									
 									//acquire its lock
@@ -222,7 +229,7 @@ public class Server{
 										if (ack_m.substring(0,9).equals("RECEIVED ")){
 											if (ack_m.substring(9).equals(username)){
 												
-									
+												System.out.println("Sent sent"+username);
 												ack.write("SENT ");
 												ack.write(usr_to_receive);
 												ack.newLine();
@@ -245,6 +252,10 @@ public class Server{
 									//release the lock
 									receive_end.lock_stream.unlock();
 								}
+									else{
+										error = 101;
+									}
+								}
 							}
 							else{
 								error = 103;
@@ -253,11 +264,7 @@ public class Server{
 						else{
 							error = 103;
 						}
-					}
-					else{
-						//error user to send message not found
-						error = 101;
-					}
+					
 				}
 				else if (s1.equals("UNREGISTER") && messg.read()=='\n'){
 					users.remove(username);
@@ -312,14 +319,10 @@ public class Server{
 						ack.flush();
 						break;
 					default:
-						ack.write("ERROR 106 Unrecognized Error");
-						ack.newLine();
-						ack.newLine();
-						ack.flush();
-						
 
 				}
 			}			
+			System.out.println(username + "deregistered");
 			}
 			catch(Exception e){
 				e.printStackTrace();

@@ -16,6 +16,7 @@ import java.util.Base64;
 import java.security.MessageDigest;
 import javax.crypto.Cipher;
 // import CryptographyExample.*;
+import javax.crypto.SecretKey;
 
 public class Client{
 	
@@ -30,14 +31,18 @@ public class Client{
 	private BufferedWriter stdout_writer= null;
 	private Thread send_thread;
 	private Thread receive_thread;
-	private Boolean is_active;
+	// private Boolean is_active;
+	private byte[] pk = null;
+	private byte[] sk = null;
 
 
 	Client(String username, String address, int port1, int port2) {
 		try{
 
 			this.username = username;
-			
+			KeyPair kp = CryptFuncs.generateKeyPair();
+			this.pk = kp.getPublic().getEncoded();
+			this.sk = kp.getPrivate().getEncoded();
 			// first establish TCP for sending msgs
 			socket_send = new Socket(address, port1);
 			// then establish TCP for receiving msgs
@@ -61,6 +66,9 @@ public class Client{
 		catch(IOException i){
 			System.out.println("C 2");
 			i.printStackTrace();
+		}
+		catch(Exception e){
+			e.printStackTrace();
 		}
 
 
@@ -106,7 +114,7 @@ public class Client{
 			while(true){
 				String s1 = stdin_reader.readLine();
 				int error = 0;
-				if (s1.length()<=5){
+				if (s1.length()<=4){
 					error = 1;
 				}
 				else if (s1.equals("UNREGISTER")){
@@ -139,51 +147,56 @@ public class Client{
 					else{
 						String user = mesg[0].substring(1);
 						// System.out.println(user);
-						String message = mesg[1].substring(1);
-						// System.out.println(message);
-
-						send_msg.write("SEND "+user);
-						// send_msg.write(user);
-						send_msg.newLine();
-						send_msg.write("Content-length: ");
-						send_msg.write(Integer.toString(message.length()));
-						send_msg.newLine();
-						send_msg.newLine();
-						send_msg.write(message);
-						send_msg.newLine();
-						send_msg.newLine();
-						send_msg.flush();
-						String sack = sent_ack.readLine();
-						if(sent_ack.read()=='\n'){
-							stdout_writer.write(sack);
-							stdout_writer.newLine();
-							stdout_writer.flush();
-							// if (sack.charAt[0]!='S' && sack.length()<=5){
-							// 	stdout_writer.write(sack);
-							// }
-							// if (sack.substring(0,5).equals("SENT ")){
-							// 	if (sack.substring(5).equals(user)){
-							// 		//ack received
-							// 		//display custom message
-							// 		stdout_writer.write("SUCCESSFULLY SENT\n");
-							// 		stdout_writer.flush();
-							// 	}
-							// 	else{
-							// 		stdout_writer.write("SENT TO BAD USER\n");
-							// 		stdout_writer.flush();
-							// 		//ack incorrectly received
-							// 	}
-							// }
-							// else if (sack.equals("ERROR 102 Unable to send")){
-								// stdout_writer.write("Error, Unable to send\n");
-								
-								//header incorrect
-							
+						if (mesg[1].charAt(0)!=' '){
+							error = 1;
 						}
 						else{
-							stdout_writer.write("Bad Response from server\n");
-							stdout_writer.flush();
-					}
+							String message = mesg[1].substring(1);
+							// System.out.println(message);
+
+							send_msg.write("SEND "+user);
+							// send_msg.write(user);
+							send_msg.newLine();
+							send_msg.write("Content-length: ");
+							send_msg.write(Integer.toString(message.length()));
+							send_msg.newLine();
+							send_msg.newLine();
+							send_msg.write(message);
+							send_msg.newLine();
+							send_msg.newLine();
+							send_msg.flush();
+							String sack = sent_ack.readLine();
+							if(sent_ack.read()=='\n'){
+								stdout_writer.write(sack);
+								stdout_writer.newLine();
+								stdout_writer.flush();
+								// if (sack.charAt[0]!='S' && sack.length()<=5){
+								// 	stdout_writer.write(sack);
+								// }
+								// if (sack.substring(0,5).equals("SENT ")){
+								// 	if (sack.substring(5).equals(user)){
+								// 		//ack received
+								// 		//display custom message
+								// 		stdout_writer.write("SUCCESSFULLY SENT\n");
+								// 		stdout_writer.flush();
+								// 	}
+								// 	else{
+								// 		stdout_writer.write("SENT TO BAD USER\n");
+								// 		stdout_writer.flush();
+								// 		//ack incorrectly received
+								// 	}
+								// }
+								// else if (sack.equals("ERROR 102 Unable to send")){
+									// stdout_writer.write("Error, Unable to send\n");
+									
+									//header incorrect
+								
+							}
+							else{
+								stdout_writer.write("Bad Response from server\n");
+								stdout_writer.flush();
+							}
+						}
 					}
 				}
 				else{
@@ -192,7 +205,7 @@ public class Client{
 				}
 				switch(error){
 					case 1:
-						stdout_writer.write("Incorrect format, please type again");
+						stdout_writer.write("Incorrect format, please type again\n");
 						stdout_writer.flush();
 						break;
 					case 2:
@@ -318,7 +331,12 @@ public class Client{
 	
 
 	public static void main(String[] args) {
-		CryptFuncs.generateKeyPair();
+		try{
+			CryptFuncs.generateKeyPair();
+		}
+		catch(Exception e){
+			e.printStackTrace();
+		}
 		// CryptographyExample ce;
 		Client client = new Client(args[0],args[1],Integer.parseInt(args[2]),Integer.parseInt(args[3]));
 
