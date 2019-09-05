@@ -1,9 +1,24 @@
+
 import java.net.*;
 import java.io.*;
 import java.util.*;
-
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.SecureRandom;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
+import java.security.MessageDigest;
+import javax.crypto.Cipher;
+// import CryptographyExample.*;
 
 public class Client{
+	
 	private Socket socket_send = null;
 	private Socket socket_receive= null;
 	private String username;
@@ -20,7 +35,9 @@ public class Client{
 
 	Client(String username, String address, int port1, int port2) {
 		try{
+
 			this.username = username;
+			
 			// first establish TCP for sending msgs
 			socket_send = new Socket(address, port1);
 			// then establish TCP for receiving msgs
@@ -301,8 +318,14 @@ public class Client{
 	
 
 	public static void main(String[] args) {
-		
+		CryptFuncs.generateKeyPair();
+		// CryptographyExample ce;
 		Client client = new Client(args[0],args[1],Integer.parseInt(args[2]),Integer.parseInt(args[3]));
 
 	}
 }
+
+
+
+
+
