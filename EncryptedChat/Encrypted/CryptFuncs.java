@@ -30,10 +30,10 @@ public class CryptFuncs {
 
         return encryptedBytes;
     }
-    public static String encrypt_encode(byte[] publicKey,String data){
+    public static String encrypt_encode(byte[] publicKey,String data) throws Exception{
         return Base64.getEncoder().encodeToString(encrypt(publicKey,data.getBytes()));
     }
-    public static String decrypt_decode(byte[] privateKey, String encoded_data){
+    public static String decrypt_decode(byte[] privateKey, String encoded_data) throws Exception{
         return new String(decrypt(privateKey,Base64.getDecoder().decode(encoded_data)));
     }
 
@@ -70,6 +70,12 @@ public class CryptFuncs {
     public static String encode_toB64(String st){
         return Base64.getEncoder().encodeToString(st.getBytes());
     }
+    public static String encode_toString(byte[] bt){
+        return Base64.getEncoder().encodeToString(bt);
+    }
+    public static byte[] decode_fromString(String st){
+        return Base64.getDecoder().decode(st);
+    }
 
     public static String decode_fromB64(String st){
         return new String(Base64.getDecoder().decode(st));
@@ -104,18 +110,28 @@ public class CryptFuncs {
     //     String st = new String(decoded_);
     //     String st_1 = new String(decoded_1);
     //     String st_2 = new String(decoded_2);
+        byte[] ed = encryptedData;
+        byte[] decryptedData = decrypt(privateKey, ed);
+        String msg = "hi there";
+        char[] ss = {'a','b','c','d'};
 
-        byte[] decryptedData = decrypt(privateKey, encryptedData);
+        System.out.println(new String(ss));
 
-        System.out.println(new String(encryptedData));
-        System.out.println(new String(decryptedData));
+        System.out.println(decrypt_decode(privateKey,encrypt_encode(publicKey,msg)));
+        // System.out.println(ed);
+        System.out.println(encryptedData.length);
+        System.out.println((Base64.getEncoder().encode(encryptedData)).length);
+        // System.out.println((Base64.getEncoder().encodeToString(encryptedData)));
+        System.out.println();
+        System.out.println((new String((new String(encryptedData)).getBytes())).length());
+        System.out.println((new String(encryptedData)).length());
 
     //     System.out.println(st);
     //     System.out.println(st_1);
     //     System.out.println(st_2);
     //     System.out.println(encoded_1);
     //     System.out.println(encoded_2);
-    //     // /System.out.println(new String(decryptedData));
+        System.out.println(new String(decryptedData));
 
 
     }

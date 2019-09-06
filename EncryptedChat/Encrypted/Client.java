@@ -153,48 +153,52 @@ public class Client{
 						else{
 							String message = mesg[1].substring(1);
 							// System.out.println(message);
-
-							send_msg.write("SEND "+user);
-							// send_msg.write(user);
-							send_msg.newLine();
-							send_msg.write("Content-length: ");
-							send_msg.write(Integer.toString(message.length()));
-							send_msg.newLine();
-							send_msg.newLine();
-							send_msg.write(message);
+							// get public key
+							send_msg.write("GETPK "+user);
 							send_msg.newLine();
 							send_msg.newLine();
 							send_msg.flush();
-							String sack = sent_ack.readLine();
-							if(sent_ack.read()=='\n'){
-								stdout_writer.write(sack);
+
+							String recv_header = sent_ack.readLine();
+							
+							String pke_user = sent_ack.readLine();
+							if (pke_user.equals(null)){
+								stdout_writer.write(recv_header);
 								stdout_writer.newLine();
 								stdout_writer.flush();
-								// if (sack.charAt[0]!='S' && sack.length()<=5){
-								// 	stdout_writer.write(sack);
-								// }
-								// if (sack.substring(0,5).equals("SENT ")){
-								// 	if (sack.substring(5).equals(user)){
-								// 		//ack received
-								// 		//display custom message
-								// 		stdout_writer.write("SUCCESSFULLY SENT\n");
-								// 		stdout_writer.flush();
-								// 	}
-								// 	else{
-								// 		stdout_writer.write("SENT TO BAD USER\n");
-								// 		stdout_writer.flush();
-								// 		//ack incorrectly received
-								// 	}
-								// }
-								// else if (sack.equals("ERROR 102 Unable to send")){
-									// stdout_writer.write("Error, Unable to send\n");
-									
-									//header incorrect
-								
+							}
+							else if (sent_ack.read()=='\n'){
+								if (recv_header.equals("SENDPK "+user)){
+									byte[] pk_user = CryptFuncs.decode_fromString(pke_user);
+									String msg_tosend = CryptFuncs.encrypt_encode(pk_user,message);
+									send_msg.write("SEND "+user);
+									// send_msg.write(user);
+									send_msg.newLine();
+									send_msg.write("Content-length: ");
+									send_msg.write(Integer.toString(msg_tosend.length()));
+									send_msg.newLine();
+									send_msg.newLine();
+									send_msg.write(msg_tosend);
+									send_msg.newLine();
+									send_msg.newLine();
+									send_msg.flush();
+									String sack = sent_ack.readLine();
+									if(sent_ack.read()=='\n'){
+										stdout_writer.write(sack);
+										stdout_writer.newLine();
+										stdout_writer.flush();
+									}
+									else{
+										stdout_writer.write("Bad Response from server\n");
+										stdout_writer.flush();
+									}
+								}	
+								else{
+									error = 2;
+								}
 							}
 							else{
-								stdout_writer.write("Bad Response from server\n");
-								stdout_writer.flush();
+								error = 2;
 							}
 						}
 					}
@@ -232,6 +236,9 @@ public class Client{
 				String reg_rcv = "REGISTER TORECV "+(username);
 				received_ack.write(reg_rcv);
 				received_ack.newLine();
+				received_ack.write("PK ");
+				received_ack.write(CryptFuncs.encode_toString(pk));
+				received_ack.newLine();
 				received_ack.newLine();
 				received_ack.flush();
 				String s = receive_msg.readLine();
@@ -245,11 +252,15 @@ public class Client{
 							break;
 						}
 						else{
-							//error
+							stdout_writer.write(s);
+							stdout_writer.newLine();
+							stdout_writer.flush();
 						}
 				}
 				else{
-					//error
+					stdout_writer.write(s);
+					stdout_writer.newLine();
+					stdout_writer.flush();
 				}
 				
 			}
@@ -282,7 +293,8 @@ public class Client{
 									stdout_writer.write("#");
 									stdout_writer.write(user);
 									stdout_writer.write(": ");
-									stdout_writer.write(char_buf,0,number_chars);
+									String msg_decrypted = CryptFuncs.decrypt_decode(sk,new String(char_buf));
+									stdout_writer.write(msg_decrypted);
 									stdout_writer.newLine();
 									
 									stdout_writer.flush();
