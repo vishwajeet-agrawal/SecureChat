@@ -120,7 +120,7 @@ public class Server{
 				int error=0;
 				if (messg.read()=='\n'){
 					if (s1.length()<=16){
-						error = 101;
+						error = 103;
 					}
 					else if (s1.substring(0,16).equals("REGISTER TOSEND ")){
 						// System.out.println("REgistered to send ");
@@ -128,6 +128,7 @@ public class Server{
 						String usr = s1.substring(16);
 						if (send_users.containsKey(usr)){
 							//error user already present
+							error = 102;
 						}
 						else if (checkUsernameWellFormed(usr)){
 							send_users.put(usr,this);
@@ -149,30 +150,14 @@ public class Server{
 
 					}
 					else{
-						error = 101;
+						error = 103;
 					}
 				}
 				else{
-					error = 101;
+					error = 103;
 				}
-				switch(error){
-					case 101:
-						ack.write("ERROR 101 No user registered");
-						ack.newLine();
-						ack.newLine();
-						ack.flush();
-						break;
-					case 100:
-						ack.write("ERROR 100 Malformed username");
-						ack.newLine();
-						ack.newLine();
-						ack.flush();
-						break;
-					case 102:
+				error_message(ack,error);
 
-					default:
-
-				}
 			}
 
 			// loop for actual communication
@@ -229,7 +214,7 @@ public class Server{
 										if (ack_m.substring(0,9).equals("RECEIVED ")){
 											if (ack_m.substring(9).equals(username)){
 												
-												System.out.println("Sent "+username);
+												// System.out.println("Sent "+username);
 												ack.write("SENT ");
 												ack.write(usr_to_receive);
 												ack.newLine();
@@ -246,7 +231,7 @@ public class Server{
 									}
 									else{
 									//error bad ack
-										error = 102;
+										error = 107;
 									}
 									
 									//release the lock
@@ -290,6 +275,7 @@ public class Server{
 							ack.write(user_to_get);
 							ack.newLine();
 							ack.write(pk);
+							// System.out.print(pk);
 							ack.newLine();
 							ack.newLine();
 							ack.flush();
@@ -302,46 +288,8 @@ public class Server{
 				else{
 					error = 103;
 				}
-			
+				error_message(ack,error);
 				
-				switch(error){
-					case 101:
-						ack.write("ERROR 101 User to send message not found");
-						ack.newLine();
-						ack.newLine();
-						
-						ack.flush();
-						break;
-					case 102:
-						ack.write("ERROR 102 Unable to send");
-						ack.newLine();
-						ack.newLine();
-						
-						ack.flush();
-						break;
-					case 103:
-						ack.write("ERROR 103 Header incomplete");
-						ack.newLine();
-						ack.newLine();
-						
-						ack.flush();
-						break;
-					case 104:
-						ack.write("ERROR 104 Message Corrupted");
-						ack.newLine();
-						ack.newLine();
-						
-						ack.flush();
-						break;
-					case 105:
-						ack.write("ERROR 105 Command not found");
-						ack.newLine();
-						ack.newLine();
-						ack.flush();
-						break;
-					default:
-
-				}
 			}			
 			System.out.println(username + "deregistered");
 			}
@@ -400,7 +348,7 @@ public class Server{
 								String usr = s1.substring(16);
 								if (receive_users.containsKey(usr)){
 									//error user already registered
-									error = 100;
+									error = 102;
 								}
 								else if (checkUsernameWellFormed(usr)){
 									// System.out.println("4");
@@ -425,32 +373,13 @@ public class Server{
 							}
 						}
 						else{
-							error = 101;
+							error = 103;
 						}
 					}
 					else{
-						error = 101; //no user registered
+						error = 103; //no user registered
 					}
-					switch(error){
-						case 101:
-							mesg.write("ERROR 101 No user registered");
-							mesg.newLine();
-							mesg.newLine();
-							mesg.flush();
-							break;
-						case 100:
-							mesg.write("ERROR 100 Malformed username");
-							mesg.newLine();
-							mesg.newLine();
-							mesg.flush();
-							break;
-						case 102:
-							mesg.write("ERROR 102 username already exists");
-							mesg.newLine();
-							mesg.newLine();
-							mesg.flush();
-						default:
-					}
+					error_message(mesg,error);
 					lock_stream.unlock();
 				}	
 				lock_stream.unlock();
@@ -471,5 +400,39 @@ public class Server{
 		}
 		return check;
 	}	
-
+	void error_message(BufferedWriter mesg, int error){
+		try{
+		switch(error){
+			case 100:
+				mesg.write("ERROR 100 Malformed username");
+				break;
+			case 101:
+				mesg.write("ERROR 101 User to send message not found");
+				break;
+			case 102:
+				mesg.write("ERROR 102 username already exists");
+				break;
+			case 103:
+				mesg.write("ERROR 103 incomplete header");
+				break;
+			case 104:
+				mesg.write("ERROR 104 Message Corrupted");
+				break;
+			case 105:
+				mesg.write("ERROR 105 Command not found");
+				break;
+			case 107:
+				mesg.write("ERROR 107 unable to send");
+				break;
+			default:
+				return;
+		}
+		mesg.newLine();
+		mesg.newLine();
+		mesg.flush();
+	}
+	catch(Exception e){
+		e.printStackTrace();
+	}
+	}
 }

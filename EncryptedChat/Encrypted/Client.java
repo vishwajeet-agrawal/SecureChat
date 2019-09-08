@@ -18,8 +18,10 @@ import javax.crypto.Cipher;
 // import CryptographyExample.*;
 import javax.crypto.SecretKey;
 
+// import sun.java2d.ReentrantContext;
+import java.util.concurrent.locks.ReentrantLock;
 public class Client{
-	
+	private ReentrantLock read_input_lock = new ReentrantLock();
 	private Socket socket_send = null;
 	private Socket socket_receive= null;
 	private String username;
@@ -31,6 +33,7 @@ public class Client{
 	private BufferedWriter stdout_writer= null;
 	private Thread send_thread;
 	private Thread receive_thread;
+	private Boolean get_another_username = false;
 	// private Boolean is_active;
 	private byte[] pk = null;
 	private byte[] sk = null;
@@ -105,10 +108,17 @@ public class Client{
 				else{
 					//error
 				}
-				stdout_writer.write(s);
-				stdout_writer.write("Re-enter your username: ");
-				stdout_writer.flush();
-				username = stdin_reader.readLine();
+				
+				read_input_lock.lock();
+				if (!get_another_username){
+					stdout_writer.write(s);
+					stdout_writer.newLine();
+					stdout_writer.write("Re-enter your username: ");
+					stdout_writer.flush();
+					username = stdin_reader.readLine();
+					get_another_username = true;
+				}
+				read_input_lock.unlock();
 			}
 			//actual communication
 			while(true){
@@ -162,7 +172,9 @@ public class Client{
 							String recv_header = sent_ack.readLine();
 							
 							String pke_user = sent_ack.readLine();
-							if (pke_user.equals(null)){
+							// System.out.println(recv_header);
+							// System.out.println(pke_user);
+							if (pke_user.equals(new String())){
 								stdout_writer.write(recv_header);
 								stdout_writer.newLine();
 								stdout_writer.flush();
@@ -183,6 +195,8 @@ public class Client{
 									send_msg.newLine();
 									send_msg.flush();
 									String sack = sent_ack.readLine();
+									// System.out.println(sack);
+									// System.out.println(111);
 									if(sent_ack.read()=='\n'){
 										stdout_writer.write(sack);
 										stdout_writer.newLine();
@@ -252,17 +266,26 @@ public class Client{
 							break;
 						}
 						else{
-							stdout_writer.write(s);
-							stdout_writer.newLine();
-							stdout_writer.flush();
+							
 						}
 				}
 				else{
+					// stdout_writer.write(s);
+					// stdout_writer.newLine();
+					// stdout_writer.flush();
+				}
+				// stdout_writer.write(s);
+				
+				read_input_lock.lock();
+				if (!get_another_username){	
 					stdout_writer.write(s);
 					stdout_writer.newLine();
+					stdout_writer.write("Re-enter your username: ");
 					stdout_writer.flush();
+					username = stdin_reader.readLine();
+					get_another_username = true;
 				}
-				
+				read_input_lock.unlock();
 			}
 			//actual loop for receiving messages 
 			while(true){
