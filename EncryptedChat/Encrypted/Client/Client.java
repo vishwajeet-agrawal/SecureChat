@@ -22,6 +22,7 @@ import javax.crypto.SecretKey;
 import java.util.concurrent.locks.ReentrantLock;
 public class Client{
 	private ReentrantLock read_input_lock = new ReentrantLock();
+	private ReentrantLock write_lock = new ReentrantLock();
 	private Socket socket_send = null;
 	private Socket socket_receive= null;
 	private String username;
@@ -94,10 +95,10 @@ public class Client{
 				String s = sent_ack.readLine();
 				if (sent_ack.read()=='\n'){
 						if (s.equals("REGISTERED TOSEND " + username)){
-							stdout_writer.write("Successfully registered to send messages");
-							stdout_writer.newLine();
+							output_client("Successfully registered to send messages");
+							// stdout_writer.newLine();
 							//stdout_writer.newLine();
-							stdout_writer.flush();
+							// stdout_writer.flush();
 							break;
 						}
 						else{
@@ -111,10 +112,12 @@ public class Client{
 				
 				read_input_lock.lock();
 				if (!get_another_username){
+					write_lock.lock();
 					stdout_writer.write(s);
 					stdout_writer.newLine();
 					stdout_writer.write("Re-enter your username: ");
 					stdout_writer.flush();
+					write_lock.unlock();
 					username = stdin_reader.readLine();
 					get_another_username = true;
 				}
@@ -138,9 +141,10 @@ public class Client{
 						error = 2;
 					}
 					else{
-						stdout_writer.write(sack);
-						stdout_writer.newLine();
-						stdout_writer.flush();
+						output_client(sack);
+						// stdout_writer.write(sack);
+						// stdout_writer.newLine();
+						// stdout_writer.flush();
 						if (sack.equals("UNREGISTERED")){
 							break;
 						}
@@ -175,9 +179,10 @@ public class Client{
 							// System.out.println(recv_header);
 							// System.out.println(pke_user);
 							if (pke_user.equals(new String())){
-								stdout_writer.write(recv_header);
-								stdout_writer.newLine();
-								stdout_writer.flush();
+								output_client(recv_header);
+								// stdout_writer.write(recv_header);
+								// stdout_writer.newLine();
+								// stdout_writer.flush();
 							}
 							else if (sent_ack.read()=='\n'){
 								if (recv_header.equals("SENDPK "+user)){
@@ -198,13 +203,15 @@ public class Client{
 									// System.out.println(sack);
 									// System.out.println(111);
 									if(sent_ack.read()=='\n'){
-										stdout_writer.write(sack);
-										stdout_writer.newLine();
-										stdout_writer.flush();
+										output_client(sack);
+										// stdout_writer.write(sack);
+										// stdout_writer.newLine();
+										// stdout_writer.flush();
 									}
 									else{
-										stdout_writer.write("Bad Response from server\n");
-										stdout_writer.flush();
+										output_client("Bad Response from server");
+										// stdout_writer.write("Bad Response from server\n");
+										// stdout_writer.flush();
 									}
 								}	
 								else{
@@ -223,12 +230,14 @@ public class Client{
 				}
 				switch(error){
 					case 1:
-						stdout_writer.write("Incorrect format, please type again\n");
-						stdout_writer.flush();
+						output_client("Incorrect format, please type again");
+						// stdout_writer.write("Incorrect format, please type again\n");
+						// stdout_writer.flush();
 						break;
 					case 2:
-						stdout_writer.write("Bad Response from server\n");
-						stdout_writer.flush();
+						output_client("Bad Response from server");
+						// stdout_writer.write("Bad Response from server\n");
+						// stdout_writer.flush();
 				}
 			}
 			
@@ -260,9 +269,10 @@ public class Client{
 				if (receive_msg.read()=='\n'){
 						// System.out.println(s);
 						if (s.equals("REGISTERED TORECV " + username)){
-							stdout_writer.write("Successfully registered to receive messages\n");
+							output_client("Successfully registered to receive messages");
+							// stdout_writer.write("Successfully registered to receive messages\n");
 							
-							stdout_writer.flush();
+							// stdout_writer.flush();
 							break;
 						}
 						else{
@@ -278,10 +288,12 @@ public class Client{
 				
 				read_input_lock.lock();
 				if (!get_another_username){	
+					write_lock.lock();
 					stdout_writer.write(s);
 					stdout_writer.newLine();
 					stdout_writer.write("Re-enter your username: ");
 					stdout_writer.flush();
+					write_lock.unlock();
 					username = stdin_reader.readLine();
 					get_another_username = true;
 				}
@@ -313,6 +325,7 @@ public class Client{
 									
 									
 									//write to console
+									write_lock.lock();
 									stdout_writer.write("#");
 									stdout_writer.write(user);
 									stdout_writer.write(": ");
@@ -321,7 +334,7 @@ public class Client{
 									stdout_writer.newLine();
 									
 									stdout_writer.flush();
-
+									write_lock.unlock();
 								}
 								else{
 									error =2;
@@ -362,7 +375,13 @@ public class Client{
 		}
 		}
 	}
-	
+	public void output_client(String msg) throws Exception{
+		write_lock.lock();
+		stdout_writer.write(msg);
+		stdout_writer.newLine();
+		stdout_writer.flush();
+		write_lock.unlock();
+	}
 	
 
 	public static void main(String[] args) {
