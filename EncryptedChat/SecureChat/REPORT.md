@@ -1,8 +1,8 @@
 # Report on extension of chat application
 
-1. Unregistering user if a he goes offline without explicitly unregistering (using ^C):
+1. Unregistering user if he goes offline without explicitly unregistering (using ^C):
 
--  Implemented by checking if read string is null and then deregistering the user.
+-  Implemented by checking if read string is null and then deregistering the user and catching exception.
 
 2. Simulating Whatsapp, `SENT`, `DELIVERED`, `READ` acks & Offline Users. 
 
