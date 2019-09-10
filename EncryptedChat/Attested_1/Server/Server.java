@@ -130,7 +130,7 @@ public class Server{
 							//error user already present
 							error = 102;
 						}
-						else if (Server.checkUsernameWellFormed(usr)){
+						else if (checkUsernameWellFormed(usr)){
 							send_users.put(usr,this);
 							if (receive_users.containsKey(usr)){
 								users.add(usr);
@@ -163,15 +163,11 @@ public class Server{
 			// loop for actual communication
 			while(true){
 				String s1 = messg.readLine();
-				if (s1==null){
-					// user deregistered
-					users.remove(username);
-					users_pk.remove(username);
-					send_users.remove(username);
-					receive_users.remove(username);
-					send_handlers.remove(this);
-					break;
-				}
+				// reading until 2 consecutive \n
+				// int state_ = 0 ;
+
+				// print(s1);
+				// System.out.println(s1.length());
 				int error=0;
 				if (s1.length()<=5){
 					error = 105;
@@ -263,10 +259,9 @@ public class Server{
 				}
 				else if (s1.equals("UNREGISTER") && messg.read()=='\n'){
 					users.remove(username);
-					users_pk.remove(username);
 					send_users.remove(username);
 					receive_users.remove(username);
-					send_handlers.remove(this);
+
 					ack.write("UNREGISTERED");
 					ack.newLine();
 					ack.newLine();										
@@ -308,7 +303,9 @@ public class Server{
 				e.printStackTrace();
 			}
 		}
-
+		// void forwardMessage(String user_to_receive, char[] msg_to_send, int number_chars){
+			
+		// }
 	}
 
 	
@@ -325,6 +322,11 @@ public class Server{
 			this.s = s;
 			this.ack = br;
 			this.mesg = bw;
+			
+			//lock_stream.lock();
+			// pis = new PipedInputStream();
+			// pos = new PipedOutputStream(pis);
+			// pis.connect(pos);
 		}
 		public void run(){
 			try{
@@ -388,7 +390,6 @@ public class Server{
 					lock_stream.unlock();
 				}	
 				lock_stream.unlock();
-				receive_handlers.remove(this);
 			}
 			catch(Exception e){
 				e.printStackTrace();
@@ -396,7 +397,16 @@ public class Server{
 		}
 		
 }
-	
+	Boolean checkUsernameWellFormed(String usr){
+		Boolean check = true;
+		for(int i=0;i<usr.length();i++){
+			char x = usr.charAt(i);
+			if ((x >= 48 && x<=57) || (x>=65 && x<=90) || (x>=97 && x<=122)){
+				check = check && true;
+			}
+		}
+		return check;
+	}	
 	void error_message(BufferedWriter mesg, int error){
 		try{
 		switch(error){
@@ -432,14 +442,4 @@ public class Server{
 		e.printStackTrace();
 	}
 	}
-	public static Boolean checkUsernameWellFormed(String usr){
-		Boolean check = true;
-		for(int i=0;i<usr.length();i++){
-			int x = usr.charAt(i);
-			if (!((x >= 48 && x<=57) || (x>=65 && x<=90) || (x>=97 && x<=122))){
-				check = check && false;
-			}
-		}
-		return check;
-	}	
 }
